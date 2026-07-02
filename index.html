@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1B3A2F" />
+<title>Lance-Dé — Notification persistante</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<style>
+  :root{
+    --felt: #1B3A2F;
+    --felt-dark: #12271F;
+    --ivory: #F3ECDD;
+    --ink: #2B2118;
+    --amber: #C98A3B;
+    --amber-bright: #E0A85C;
+    --muted: #A9BDB2;
+    --font-display: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", "Space Mono", Menlo, Consolas, monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: radial-gradient(120% 90% at 50% -10%, #234A3B 0%, var(--felt) 45%, var(--felt-dark) 100%);
+    color: var(--ivory);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    min-height: 100dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+  }
+
+  .status{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom: 22px;
+  }
+  .status .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:#5CB88C;
+    box-shadow: 0 0 6px #5CB88C;
+  }
+  .status.offline .dot{ background:#C9603B; box-shadow: 0 0 6px #C9603B; }
+
+  header{ text-align:center; margin-bottom: 6px; }
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--amber-bright);
+    margin: 0 0 10px;
+  }
+  h1{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(32px, 8vw, 46px);
+    margin: 0 0 4px;
+    letter-spacing: 0.01em;
+  }
+  .subtitle{
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 30px;
+    max-width: 320px;
+  }
+
+  .scene{
+    perspective: 900px;
+    width: 150px; height: 150px;
+    margin: 10px 0 18px;
+  }
+  .die{
+    width:100%; height:100%;
+    position:relative;
+    transform-style: preserve-3d;
+    transition: transform 1.05s cubic-bezier(.34,1.56,.64,1);
+    transform: rotateX(0deg) rotateY(0deg);
+  }
+  .face{
+    position:absolute;
+    width:150px; height:150px;
+    background: linear-gradient(155deg, var(--ivory), #E8DFC7);
+    border-radius: 20px;
+    box-shadow: inset 0 0 0 1px rgba(43,33,24,0.08);
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: 22px;
+  }
+  .pip{ width:20px; height:20px; border-radius:50%; background: var(--ink); justify-self:center; align-self:center; opacity:0; }
+  .f1{ transform: translateZ(75px); }
+  .f6{ transform: rotateY(180deg) translateZ(75px); }
+  .f2{ transform: rotateY(90deg) translateZ(75px); }
+  .f5{ transform: rotateY(-90deg) translateZ(75px); }
+  .f3{ transform: rotateX(90deg) translateZ(75px); }
+  .f4{ transform: rotateX(-90deg) translateZ(75px); }
+
+  .shadow{
+    width: 120px; height: 22px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(0,0,0,0.38), transparent 75%);
+    margin-bottom: 26px;
+    filter: blur(1px);
+    transition: transform 1.05s ease;
+  }
+  .die.rolling ~ .shadow{ transform: scale(0.85); }
+
+  .result-line{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 18px;
+    margin-bottom: 22px;
+    text-align:center;
+  }
+  .result-line b{ color: var(--amber-bright); font-size: 15px; }
+
+  button{
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+  }
+
+  .roll-btn{
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--felt-dark);
+    background: linear-gradient(160deg, var(--amber-bright), var(--amber));
+    padding: 15px 40px;
+    border-radius: 999px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+    letter-spacing: 0.01em;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .roll-btn:active{ transform: translateY(2px) scale(0.98); box-shadow: 0 4px 12px rgba(0,0,0,0.28); }
+  .roll-btn:disabled{ opacity: 0.55; cursor: default; transform:none; }
+
+  .panel{
+    width: 100%;
+    max-width: 380px;
+    margin-top: 34px;
+    border-top: 1px solid rgba(243,236,221,0.12);
+    padding-top: 22px;
+  }
+
+  .notif-row{
+    display:flex; align-items:center; justify-content:space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .notif-copy{ font-size: 13px; color: var(--muted); line-height:1.4; }
+  .notif-copy strong{ color: var(--ivory); display:block; font-size:14px; margin-bottom:2px; font-family: var(--font-display); font-weight:600;}
+
+  .switch{
+    flex-shrink:0;
+    width: 46px; height: 27px;
+    border-radius: 999px;
+    background: rgba(243,236,221,0.15);
+    position: relative;
+    transition: background 0.2s ease;
+  }
+  .switch.on{ background: var(--amber); }
+  .switch .knob{
+    position:absolute; top:3px; left:3px;
+    width:21px; height:21px; border-radius:50%;
+    background: var(--ivory);
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .switch.on .knob{ transform: translateX(19px); }
+
+  #install-btn{
+    display:none;
+    width:100%;
+    background: transparent;
+    border: 1px solid rgba(243,236,221,0.3);
+    color: var(--ivory);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    padding: 11px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  .history-label{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .history{
+    display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;
+    scrollbar-width: none;
+  }
+  .history::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex-shrink:0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(243,236,221,0.08);
+    border: 1px solid rgba(243,236,221,0.14);
+    color: var(--muted);
+    padding: 7px 11px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .chip b{ color: var(--amber-bright); }
+  .chip.empty{ color: rgba(169,189,178,0.5); }
+
+  .hint{
+    margin-top: 22px;
+    font-size: 12px;
+    color: rgba(169,189,178,0.65);
+    text-align:center;
+    max-width: 340px;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .die{ transition: none; }
+    .shadow{ transition: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="status" id="status">
+    <span class="dot"></span><span id="status-text">En ligne</span>
+  </div>
+
+  <header>
+    <p class="eyebrow">Table de jeu</p>
+    <h1>Lance-Dé</h1>
+    <p class="subtitle">Un dé, une notification persistante, zéro connexion requise.</p>
+  </header>
+
+  <div class="scene">
+    <div class="die" id="die">
+      <div class="face f1">
+        <div class="pip" style="grid-area:2/2;"></div>
+      </div>
+      <div class="face f2">
+        <div class="pip" style="grid-area:1/1;"></div>
+        <div class="pip" style="grid-area:3/3;"></div>
+      </div>
+      <div class="face f3">
+        <div class="pip" style="grid-area:1/1;"></div>
+        <div class="pip" style="grid-area:2/2;"></div>
+        <div class="pip" style="grid-area:3/3;"></div>
+      </div>
+      <div class="face f4">
+        <div class="pip" style="grid-area:1/1;"></div>
+        <div class="pip" style="grid-area:1/3;"></div>
+        <div class="pip" style="grid-area:3/1;"></div>
+        <div class="pip" style="grid-area:3/3;"></div>
+      </div>
+      <div class="face f5">
+        <div class="pip" style="grid-area:1/1;"></div>
+        <div class="pip" style="grid-area:1/3;"></div>
+        <div class="pip" style="grid-area:2/2;"></div>
+        <div class="pip" style="grid-area:3/1;"></div>
+        <div class="pip" style="grid-area:3/3;"></div>
+      </div>
+      <div class="face f6">
+        <div class="pip" style="grid-area:1/1;"></div>
+        <div class="pip" style="grid-area:1/3;"></div>
+        <div class="pip" style="grid-area:2/1;"></div>
+        <div class="pip" style="grid-area:2/3;"></div>
+        <div class="pip" style="grid-area:3/1;"></div>
+        <div class="pip" style="grid-area:3/3;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="shadow"></div>
+
+  <p class="result-line" id="result-line">Prêt à lancer.</p>
+
+  <button class="roll-btn" id="roll-btn">🎲 Lancer le dé</button>
+
+  <div class="panel">
+    <button id="install-btn">⤓ Installer l'application</button>
+
+    <div class="notif-row">
+      <div class="notif-copy">
+        <strong>Notification persistante</strong>
+        Un bouton « Lancer » reste affiché dans tes notifications, même app fermée.
+      </div>
+      <button class="switch" id="notif-switch" aria-label="Activer la notification persistante">
+        <span class="knob"></span>
+      </button>
+    </div>
+
+    <p class="history-label">Historique des lancers</p>
+    <div class="history" id="history">
+      <span class="chip empty">Aucun lancer pour l'instant</span>
+    </div>
+  </div>
+
+  <p class="hint">Cette app fonctionne entièrement hors ligne. Sur Android/Chrome, la notification persistante permet de relancer le dé sans rouvrir l'app. Sur iOS, les actions de notification sont plus limitées.</p>
+
+<script>
+(function(){
+  const dieEl = document.getElementById('die');
+  const rollBtn = document.getElementById('roll-btn');
+  const resultLine = document.getElementById('result-line');
+  const historyEl = document.getElementById('history');
+  const notifSwitch = document.getElementById('notif-switch');
+  const installBtn = document.getElementById('install-btn');
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('status-text');
+
+  const FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+  // Rotation nécessaire pour amener chaque valeur face à la caméra.
+  const BASE_ROT = {
+    1: {x:0,   y:0},
+    6: {x:0,   y:180},
+    2: {x:0,   y:-90},
+    5: {x:0,   y:90},
+    3: {x:-90, y:0},
+    4: {x:90,  y:0}
+  };
+
+  let spins = 0; // pour accumuler des tours complets à chaque lancer (effet de rotation)
+  let history = JSON.parse(localStorage.getItem('dice-history') || '[]');
+  let rollCount = Number(localStorage.getItem('dice-roll-count') || 0);
+
+  function renderHistory(){
+    if(history.length === 0){
+      historyEl.innerHTML = '<span class="chip empty">Aucun lancer pour l\u2019instant</span>';
+      return;
+    }
+    historyEl.innerHTML = history
+      .slice(-12)
+      .reverse()
+      .map(h => `<span class="chip">#${h.n} → <b>${h.v}</b></span>`)
+      .join('');
+  }
+  renderHistory();
+
+  function recordRoll(value){
+    rollCount += 1;
+    history.push({ n: rollCount, v: value });
+    if(history.length > 50) history = history.slice(-50);
+    localStorage.setItem('dice-history', JSON.stringify(history));
+    localStorage.setItem('dice-roll-count', String(rollCount));
+    renderHistory();
+  }
+
+  function animateTo(value){
+    spins += 1;
+    const base = BASE_ROT[value];
+    const turns = 2 + (spins % 3); // tours supplémentaires pour varier l'effet
+    const x = base.x + turns * 360 * (Math.random() > 0.5 ? 1 : -1);
+    const y = base.y + turns * 360 * (Math.random() > 0.5 ? 1 : -1);
+    dieEl.classList.add('rolling');
+    dieEl.style.transform = `rotateX(${x}deg) rotateY(${y}deg)`;
+    setTimeout(() => dieEl.classList.remove('rolling'), 1050);
+  }
+
+  function setResultText(value){
+    resultLine.innerHTML = `Résultat : <b>${FACES[value]} ${value}</b>`;
+  }
+
+  async function postToSW(msg){
+    if(!('serviceWorker' in navigator)) return;
+    try{
+      const reg = await navigator.serviceWorker.ready;
+      if(reg.active) reg.active.postMessage(msg);
+    }catch(e){ /* ignore */ }
+  }
+
+  function localRoll(){
+    const value = 1 + Math.floor(Math.random() * 6);
+    animateTo(value);
+    setTimeout(() => {
+      setResultText(value);
+      recordRoll(value);
+    }, 900);
+    return value;
+  }
+
+  rollBtn.addEventListener('click', () => {
+    const value = localRoll();
+    // Si la notification persistante est active, on la met à jour aussi.
+    if(localStorage.getItem('notif-enabled') === '1'){
+      postToSW({ type: 'ROLL_FROM_PAGE', value });
+    }
+  });
+
+  // ---- Notification persistante ----
+  function setSwitch(on){
+    notifSwitch.classList.toggle('on', on);
+  }
+  setSwitch(localStorage.getItem('notif-enabled') === '1');
+
+  notifSwitch.addEventListener('click', async () => {
+    const currentlyOn = localStorage.getItem('notif-enabled') === '1';
+
+    if(currentlyOn){
+      localStorage.setItem('notif-enabled', '0');
+      setSwitch(false);
+      // Ferme la notification existante si possible
+      if('serviceWorker' in navigator){
+        const reg = await navigator.serviceWorker.ready;
+        const notifs = await reg.getNotifications({ tag: 'dice-persistent' });
+        notifs.forEach(n => n.close());
+      }
+      return;
+    }
+
+    if(!('Notification' in window)){
+      alert("Les notifications ne sont pas prises en charge par ce navigateur.");
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      alert("Permission refusée : impossible d'activer la notification persistante.");
+      return;
+    }
+    localStorage.setItem('notif-enabled', '1');
+    setSwitch(true);
+    postToSW({ type: 'SHOW_PERSISTENT', value: null });
+  });
+
+  // Réception d'un résultat déclenché depuis la notification (app en arrière-plan ou fermée)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if(event.data && event.data.type === 'DICE_RESULT' && event.data.value){
+        const value = event.data.value;
+        animateTo(value);
+        setTimeout(() => {
+          setResultText(value);
+          recordRoll(value);
+        }, 900);
+      }
+    });
+  }
+
+  // ---- Statut en ligne / hors ligne ----
+  function updateStatus(){
+    const online = navigator.onLine;
+    statusEl.classList.toggle('offline', !online);
+    statusText.textContent = online ? 'En ligne' : 'Hors ligne — toujours fonctionnel';
+  }
+  window.addEventListener('online', updateStatus);
+  window.addEventListener('offline', updateStatus);
+  updateStatus();
+
+  // ---- Installation (Android/desktop Chrome) ----
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'block';
+  });
+  installBtn.addEventListener('click', async () => {
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  });
+  window.addEventListener('appinstalled', () => {
+    installBtn.style.display = 'none';
+  });
+
+  // ---- Enregistrement du Service Worker ----
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>

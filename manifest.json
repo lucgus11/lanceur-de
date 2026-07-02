@@ -1,0 +1,31 @@
+{
+  "name": "Lance-Dé — Notification persistante",
+  "short_name": "Lance-Dé",
+  "description": "Lance un dé à 6 faces depuis l'app ou directement depuis une notification persistante, même hors ligne.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1B3A2F",
+  "theme_color": "#1B3A2F",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
