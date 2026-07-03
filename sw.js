@@ -63,9 +63,10 @@ async function showPersistentNotification(value) {
   await self.registration.showNotification(title, {
     body,
     tag: NOTIF_TAG,
-    renotify: false,
+    renotify: true,        // force Android à rafraîchir visiblement le contenu
     requireInteraction: true,
-    silent: true,
+    silent: false,
+    vibrate: [40],         // petite confirmation haptique que ça a bien tourné
     icon: "icon-192.png",
     badge: "icon-192.png",
     actions: [
@@ -95,9 +96,13 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  // Clic sur "Lancer" OU clic sur le corps de la notification -> on relance le dé
-  // et on republie immédiatement la notification (persistante) avec le résultat.
-  event.notification.close();
+  // Clic sur "Lancer" OU clic sur le corps de la notification -> on relance le dé.
+  // IMPORTANT : on ne fait PAS event.notification.close() ici. Sur mobile, le SW
+  // dispose d'un temps d'exécution très limité en arrière-plan ; si on ferme la
+  // notification puis qu'on la recrée de façon asynchrone, l'exécution peut être
+  // coupée entre les deux -> la notif disparaît sans revenir. En appelant
+  // showNotification() avec le même tag directement, la nouvelle remplace
+  // l'ancienne en une seule opération, sans "trou".
   const value = rollDie();
   event.waitUntil(showPersistentNotification(value));
 });
